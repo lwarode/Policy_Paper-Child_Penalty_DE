@@ -19,3 +19,4 @@ ggplot(data_koaltionsvertraege, aes(x = rel_frau, y = rel_gleichstellung, color 
            label = land,
            nudge_y = -0.01
          )
+

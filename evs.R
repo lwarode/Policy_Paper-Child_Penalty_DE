@@ -40,7 +40,7 @@ evs_summarize <- evs_de %>%
   group_by(reg_nuts1, D061) %>% 
   count() %>% 
   group_by(reg_nuts1) %>% 
-  mutate(freq = (n / sum(n)) %>% round(3)) %>%   
+  mutate(freq = 100*(n / sum(n)) %>% round(3)) %>%   
   filter(D061 == 1) %>% 
   arrange(desc(freq)) %>% 
   na.omit()
@@ -48,11 +48,15 @@ evs_summarize <- evs_de %>%
 map <- merge(german_map_full, evs_summarize, by.x = "NUTS_CODE", by.y = "reg_nuts1")
 
 tmap_options(check.and.fix = TRUE)
-tm_shape(map) +
-  tm_layout(title = "Pre-school child suffers with working mother (D061) \n % Strongly Agree",
-            title.size = .5) +
-  tm_polygons(col = 'freq',
-              n = 3)
+women_working_opinion_map <- tm_shape(map) +
+  tm_polygons(title = "Fully agree with\nstatement (%)",
+              col = 'freq',
+             # legend.format = c(scientific = TRUE), 
+              style = "cont",
+              n = 5) + 
+  tm_layout(legend.position = c("left", "top"))
+
+tmap_save( women_working_opinion_map, "evs_map.png")
 
 
 #### "Jobs scarce: Men should have more right to a job than women (3-point scale)" (C001) ####

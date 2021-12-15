@@ -51,11 +51,11 @@ tmap_options(check.and.fix = TRUE)
 women_working_opinion_map <- tm_shape(map) +
   tm_polygons(title = "Fully agree with\nstatement (%)",
               col = 'freq',
-             # legend.format = c(scientific = TRUE), 
               style = "cont",
               n = 5) + 
   tm_layout(legend.position = c("left", "top"))
 
+women_working_opinion_map
 tmap_save( women_working_opinion_map, "evs_map.png")
 
 

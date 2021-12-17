@@ -5,6 +5,7 @@ library(labelled)
 library(sjmisc)
 library(sf)
 library(tmap)
+library(rvest)
 
 #read in the data
 evs_raw <- read_dta("EVS/ZA7505_v2-0-0.dta/ZA7505_v2-0-0.dta")
@@ -55,11 +56,51 @@ women_working_opinion_map <- tm_shape(map) +
               n = 5) + 
   tm_layout(legend.position = c("left", "top"))
 
+ggplot(map) +
+  geom_sf(aes(fill = freq)) + 
+  scale_fill_viridis_c(alpha = 0.8) + 
+  theme_void() +
+  coord_sf() + 
+  labs(fill= "Fully agree with\nstatement (%)")
+
+
+
 women_working_opinion_map
 tmap_save( women_working_opinion_map, "evs_map.png")
 
 
-#### "Jobs scarce: Men should have more right to a job than women (3-point scale)" (C001) ####
+
+#### Elterngeld of fathers ####
+
+# https://www.destatis.de/DE/Themen/Gesellschaft-Umwelt/Soziales/Elterngeld/Tabellen/zeitreihe-vaeteranteil.html
+html_file <- read_html("Statistisches Bundesamt - Statistisches Bundesamt.html")
+
+#extract all tables from the document
+table_elterngeld <- html_table(html_file, header = TRUE)
+
+elterngeld <- data.frame(table_elterngeld)
+elterngeld <- elterngeld %>% filter(Land != "Land") %>%
+  mutate(X2017.1 = parse_number(str_replace(X2017.1, ',', '.'))) %>%
+  mutate(X2018.1 = parse_number(str_replace(X2018.1, ',', '.'))) %>%
+  mutate(X2019.1 = parse_number(str_replace(X2019.1, ',', '.'))) %>%
+  mutate(X2020.1 = parse_number(str_replace(X2020.1, ',', '.'))) 
+
+
+elterngeld_map <- merge(german_map_full, elterngeld, by.x = "NUTS_NAME", by.y = "Land")
+
+tm_shape(elterngeld_map)+
+  tm_polygons(col = "X2018.1")
+
+elterngeld_plot <- ggplot(elterngeld_map) + 
+  geom_sf(aes(fill = X2020.1)) +
+  scale_fill_viridis_c(trans = "sqrt", alpha = 0.8) + 
+  theme_void() +
+  coord_sf() + 
+  labs(fill= "Share of 'Elterngeld'\ntaken by fathers (%)")
+
+ggsave("elterngeld_laenderlevel.png", elterngeld_plot)
+
+#### "Jobs scarce: Men should have more riht to a job than women (3-point scale)" (C001) ####
 
 evs_de %>% 
   .$C001 %>% 
@@ -101,66 +142,6 @@ ggsave(
   filename = "plot_coo1_de_state.png",
   plot = last_plot()
 )
-
-
-
-
-
-#### Pre-school child suffers with working mother (D061)
-evs_de %>%
-  mutate(
-    german_state = reg_iso %>% 
-      unlabelled() %>% 
-      str_extract("(?<=DE-[A-Z][A-Z][:space:]).+")
-  ) %>% 
-  filter(D061 >= 1) %>% 
-  group_by(german_state, D061) %>% 
-  count() %>% 
-  group_by(german_state) %>% 
-  mutate(freq = (n / sum(n)) %>% round(3)) %>%   
-  filter(D061 == 1) %>% 
-  arrange(desc(freq)) %>% 
-  na.omit() %>% 
-  ggplot(aes(x = german_state %>% fct_reorder(-freq), y = freq)) + 
-  geom_col() +
-  labs(x = "",
-       y = "",
-       title = "Child suffers when mother goes to work",
-       subtitle = "% Agree per State") +
-  scale_y_continuous(labels = scales::percent_format(1)) + 
-  theme_bw() + 
-  theme(plot.title = element_text(hjust = .5),
-        plot.subtitle = element_text(hjust = .5),
-        axis.text.x = element_text(angle = 45, hjust = 1))
-
-ggsave(
-  filename = "plot_coo1_de_state.pdf",
-  plot = last_plot()
-)
-
-evs_de %>%
-  mutate(
-    german_state = reg_iso %>% 
-      unlabelled() %>% 
-      str_extract("(?<=DE-[A-Z][A-Z][:space:]).+")
-  ) %>% 
-  filter(D061 >= 1) %>% 
-  group_by(german_state, D061) %>% 
-  count() %>% 
-  group_by(german_state) %>% 
-  mutate(freq = (n / sum(n)) %>% round(3)) %>%   
-  #filter(D061 <= 2) %>% 
-  #arrange(desc(freq)) %>% 
-  na.omit()
-  
-  
-  
-
-ggsave(
-  filename = "plot_coo1_de_state.png",
-  plot = last_plot()
-)
-
 
 
 
@@ -231,3 +212,58 @@ state_codes %>%
 #              ifelse(reg_nuts1 == 'DEE', '15',
 #              ifelse(reg_nuts1 == 'DEF', '01',
 #              ifelse(reg_nuts1 == 'DEG', '15', NA)))))))))))))))))
+
+#### Pre-school child suffers with working mother (D061)
+evs_de %>%
+  mutate(
+    german_state = reg_iso %>% 
+      unlabelled() %>% 
+      str_extract("(?<=DE-[A-Z][A-Z][:space:]).+")
+  ) %>% 
+  filter(D061 >= 1) %>% 
+  group_by(german_state, D061) %>% 
+  count() %>% 
+  group_by(german_state) %>% 
+  mutate(freq = (n / sum(n)) %>% round(3)) %>%   
+  filter(D061 == 1) %>% 
+  arrange(desc(freq)) %>% 
+  na.omit() %>% 
+  ggplot(aes(x = german_state %>% fct_reorder(-freq), y = freq)) + 
+  geom_col() +
+  labs(x = "",
+       y = "",
+       title = "Child suffers when mother goes to work",
+       subtitle = "% Agree per State") +
+  scale_y_continuous(labels = scales::percent_format(1)) + 
+  theme_bw() + 
+  theme(plot.title = element_text(hjust = .5),
+        plot.subtitle = element_text(hjust = .5),
+        axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggsave(
+  filename = "plot_coo1_de_state.pdf",
+  plot = last_plot()
+)
+
+evs_de %>%
+  mutate(
+    german_state = reg_iso %>% 
+      unlabelled() %>% 
+      str_extract("(?<=DE-[A-Z][A-Z][:space:]).+")
+  ) %>% 
+  filter(D061 >= 1) %>% 
+  group_by(german_state, D061) %>% 
+  count() %>% 
+  group_by(german_state) %>% 
+  mutate(freq = (n / sum(n)) %>% round(3)) %>%   
+  #filter(D061 <= 2) %>% 
+  #arrange(desc(freq)) %>% 
+  na.omit()
+  
+  
+  
+
+ggsave(
+  filename = "plot_coo1_de_state.png",
+  plot = last_plot()
+)
